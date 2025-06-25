@@ -1,0 +1,33 @@
+# Outil d'Audit Sémantique - Gap Content SEO
+# Requirements pour l'application Streamlit
+
+# Interface web
+streamlit>=1.28.0
+
+# Manipulation de données
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Lecture/écriture de fichiers Excel
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+
+# Lecture de fichiers CSV avec encodage robuste
+chardet>=5.0.0
+
+# Gestion des URLs et parsing
+urllib3>=2.0.0
+
+# Utilitaires pour les dates
+python-dateutil>=2.8.0
+
+# Optionnel : pour des graphiques plus avancés
+# plotly>=5.15.0
+# altair>=5.0.0
+
+# Optionnel : pour l'analyse de texte avancée
+# nltk>=3.8.0
+# textblob>=0.17.0
+
+# Optionnel : pour la performance avec de gros datasets
+# pyarrow>=12.0.0
