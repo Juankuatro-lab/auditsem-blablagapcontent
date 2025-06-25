@@ -16,7 +16,7 @@ def main():
         layout="wide"
     )
     
-    st.title("🔍 Outil d'Audit Sémantique - Gap Content SEO")
+    st.title("Outil d'Audit Sémantique - Gap Content SEO")
     st.markdown("---")
     
     # Sidebar pour la configuration
@@ -30,55 +30,54 @@ def main():
             ["Semrush", "Ahrefs", "Custom"]
         )
         
-        # Section 2: Configuration des colonnes (si Custom)
-        if data_source == "Custom":
-            st.subheader("2. Mapping des colonnes")
-            col_keyword = st.text_input("Nom colonne Mot-clé", "Keyword")
-            col_domain = st.text_input("Nom colonne Domaine", "Domain")
-            col_position = st.text_input("Nom colonne Position", "Position")
-            col_volume = st.text_input("Nom colonne Volume de recherche", "Search Volume")
-            col_difficulty = st.text_input("Nom colonne Difficulté", "Keyword Difficulty")
-            col_intent = st.text_input("Nom colonne Intention", "Keyword Intents")
-            col_url = st.text_input("Nom colonne URL", "URL")
-        else:
-            # Configuration prédéfinie pour Semrush/Ahrefs
-            if data_source == "Semrush":
-                col_mapping = {
-                    'keyword': 'Keyword',
-                    'domain': 'URL',  # On extraira le domaine de l'URL
-                    'position': 'Position',
-                    'volume': 'Search Volume',
-                    'difficulty': 'Keyword Difficulty',
-                    'intent': 'Keyword Intents',
-                    'url': 'URL'
-                }
-            else:  # Ahrefs
-                col_mapping = {
-                    'keyword': 'Keyword',
-                    'domain': 'Domain',
-                    'position': 'Position',
-                    'volume': 'Volume',
-                    'difficulty': 'KD',
-                    'intent': 'Intent',
-                    'url': 'URL'
-                }
-        
-        # Section 3: Critères de filtrage
-        st.subheader("3. Critères Gap Content")
-        min_competitors = st.selectbox(
-            "Nombre minimum de concurrents positionnés",
-            [1, 2, 3]
-        )
-        
-        max_position = st.selectbox(
-            "Position maximum des concurrents",
-            [10, 20, 50]
-        )
-        
-        # Filtres supplémentaires
-        st.subheader("4. Filtres supplémentaires")
-        min_volume = st.number_input("Volume de recherche minimum", min_value=0, value=0)
-        max_difficulty = st.number_input("Difficulté maximum", min_value=0, max_value=100, value=100)
+            if data_source == "Custom":
+                st.subheader("2. Mapping des colonnes")
+                col_keyword = st.text_input("Nom colonne Mot-clé", "Keyword")
+                col_domain = st.text_input("Nom colonne Domaine", "Domain")
+                col_position = st.text_input("Nom colonne Position", "Position")
+                col_volume = st.text_input("Nom colonne Volume de recherche", "Search Volume")
+                col_difficulty = st.text_input("Nom colonne Difficulté", "Keyword Difficulty")
+                col_intent = st.text_input("Nom colonne Intention", "Keyword Intents")
+                col_url = st.text_input("Nom colonne URL", "URL")
+            else:
+                # Configuration prédéfinie pour Semrush/Ahrefs
+                if data_source == "Semrush":
+                    col_mapping = {
+                        'keyword': 'Keyword',
+                        'domain': 'URL',  # On extraira le domaine de l'URL
+                        'position': 'Position',
+                        'volume': 'Search Volume',
+                        'difficulty': 'Keyword Difficulty',
+                        'intent': 'Keyword Intents',
+                        'url': 'URL'
+                    }
+                else:  # Ahrefs
+                    col_mapping = {
+                        'keyword': 'Keyword',
+                        'domain': 'Domain',
+                        'position': 'Position',
+                        'volume': 'Volume',
+                        'difficulty': 'KD',
+                        'intent': 'Intent',
+                        'url': 'URL'
+                    }
+            
+            # Section 2/3: Critères de filtrage
+            st.subheader("2. Critères Gap Content")
+            min_competitors = st.selectbox(
+                "Nombre minimum de concurrents positionnés",
+                [1, 2, 3]
+            )
+            
+            max_position = st.selectbox(
+                "Position maximum des concurrents",
+                [10, 20, 50]
+            )
+            
+            # Filtres supplémentaires
+            st.subheader("3. Filtres supplémentaires")
+            min_volume = st.number_input("Volume de recherche minimum", min_value=0, value=0)
+            max_difficulty = st.number_input("Difficulté maximum", min_value=0, max_value=100, value=100)
 
     # Zone principale
     st.header("📁 Import des fichiers")
@@ -92,7 +91,7 @@ def main():
     
     # Identification du domaine principal
     if uploaded_files:
-        st.subheader("🎯 Identification du domaine principal")
+        st.subheader("Identification du domaine principal")
         
         # Option 1: Premier fichier par défaut
         main_domain_option = st.radio(
@@ -106,7 +105,7 @@ def main():
             main_domain = None
     
     # Bouton d'analyse
-    if uploaded_files and st.button("🚀 Lancer l'analyse", type="primary"):
+    if uploaded_files and st.button("Lancer l'analyse", type="primary"):
         with st.spinner("Analyse en cours..."):
             try:
                 # Traitement des fichiers
@@ -132,15 +131,26 @@ def main():
                     if gap_analysis['gap_content'].empty:
                         st.warning("Aucune opportunité de gap content trouvée avec ces critères.")
                     else:
-                        # Affichage des résultats
-                        display_results(gap_analysis)
-                        
                         # Génération du fichier Excel
                         excel_file = generate_excel_report(gap_analysis, main_domain)
                         
+                        # Affichage d'un résumé simple
+                        st.success(f"Analyse terminée ! {len(gap_analysis['gap_content'])} opportunités trouvées.")
+                        
+                        if not gap_analysis['gap_content'].empty:
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Total opportunités", len(gap_analysis['gap_content']))
+                            with col2:
+                                avg_volume = gap_analysis['gap_content']['volume'].mean()
+                                st.metric("Volume moyen", f"{avg_volume:,.0f}")
+                            with col3:
+                                total_volume = gap_analysis['gap_content']['volume'].sum()
+                                st.metric("Volume total", f"{total_volume:,.0f}")
+                        
                         # Bouton de téléchargement
                         st.download_button(
-                            label="📊 Télécharger le rapport Excel",
+                            label="Télécharger le rapport Excel",
                             data=excel_file,
                             file_name=f"gap_content_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -311,73 +321,7 @@ def perform_gap_analysis(data, main_domain, min_competitors, max_position, min_v
 
 def display_results(analysis):
     """Affiche les résultats de l'analyse"""
-    
-    st.header("📊 Résultats de l'analyse")
-    
-    gap_df = analysis['gap_content']
-    
-    if not gap_df.empty:
-        st.subheader(f"🎯 Opportunités Gap Content ({len(gap_df)} mots-clés)")
-        
-        # Métriques principales
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total opportunités", len(gap_df))
-        
-        with col2:
-            avg_volume = gap_df['volume'].mean()
-            st.metric("Volume moyen", f"{avg_volume:,.0f}")
-        
-        with col3:
-            avg_difficulty = gap_df['difficulty'].mean()
-            st.metric("Difficulté moyenne", f"{avg_difficulty:.1f}")
-        
-        with col4:
-            total_volume = gap_df['volume'].sum()
-            st.metric("Volume total", f"{total_volume:,.0f}")
-        
-        # Tableau des opportunités (aperçu)
-        st.subheader("🔍 Top 20 des opportunités")
-        display_df = gap_df.sort_values('volume', ascending=False).head(20)
-        
-        # Colonnes à afficher
-        display_cols = ['keyword', 'volume', 'difficulty', 'intent', 'competitor_count']
-        
-        # Ajouter les colonnes des domaines concurrents
-        domain_cols = [col for col in gap_df.columns if col.endswith('_position')]
-        domain_names = [col.replace('_position', '') for col in domain_cols]
-        
-        for domain in domain_names[:5]:  # Limiter à 5 concurrents pour l'affichage
-            if f'{domain}_position' in display_df.columns:
-                display_cols.append(f'{domain}_position')
-        
-        st.dataframe(
-            display_df[display_cols],
-            use_container_width=True,
-            column_config={
-                'keyword': 'Mot-clé',
-                'volume': st.column_config.NumberColumn('Volume', format='%d'),
-                'difficulty': st.column_config.NumberColumn('Difficulté', format='%.1f'),
-                'intent': 'Intention',
-                'competitor_count': 'Nb Concurrents'
-            }
-        )
-        
-        # Graphiques
-        st.subheader("📈 Visualisations")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Distribution des volumes
-            st.write("**Distribution des volumes de recherche**")
-            st.bar_chart(gap_df.set_index('keyword')['volume'].head(10))
-        
-        with col2:
-            # Distribution des difficultés
-            st.write("**Distribution des difficultés**")
-            st.bar_chart(gap_df.set_index('keyword')['difficulty'].head(10))
+    pass  # Fonction supprimée - seuls les résultats Excel sont nécessaires
 
 
 def generate_excel_report(analysis, main_domain):
