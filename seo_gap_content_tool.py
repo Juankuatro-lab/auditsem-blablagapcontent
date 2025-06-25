@@ -19,6 +19,26 @@ def main():
     st.title("Outil d'Audit Sémantique - Gap Content SEO")
     st.markdown("---")
     
+    # Présentation de l'outil
+    with st.expander("ℹ️ En quoi consiste ce script ?"):
+        st.markdown("""
+        Ce script sert à identifier rapidement les opportunités de trafic sur base du gap content (contenu non adressé) entre votre domaine et un ou plusieurs domaines concurrents.
+        
+        **Comment faire ?**
+        
+        **1. Préparez vos fichiers**
+        * Exportez vos données SEO (Semrush, Ahrefs, etc.) en CSV/Excel,
+        * **Important** : Téléchargez votre site en premier si vous voulez aller plus vite.
+        
+        **2. Configurez l'analyse**
+        * **Source** : Semrush/Ahrefs/Custom,
+        * **Concurrents minimum** : 2 (recommandé),
+        * **Position max** : Top 10 (page 1),
+        * **Filtres** : Volume min selon vos besoins.
+        """)
+    
+    st.markdown("---")
+    
     # Sidebar pour la configuration
     with st.sidebar:
         st.header("⚙️ Configuration")
