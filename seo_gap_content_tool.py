@@ -30,54 +30,55 @@ def main():
             ["Semrush", "Ahrefs", "Custom"]
         )
         
-            if data_source == "Custom":
-                st.subheader("2. Mapping des colonnes")
-                col_keyword = st.text_input("Nom colonne Mot-clé", "Keyword")
-                col_domain = st.text_input("Nom colonne Domaine", "Domain")
-                col_position = st.text_input("Nom colonne Position", "Position")
-                col_volume = st.text_input("Nom colonne Volume de recherche", "Search Volume")
-                col_difficulty = st.text_input("Nom colonne Difficulté", "Keyword Difficulty")
-                col_intent = st.text_input("Nom colonne Intention", "Keyword Intents")
-                col_url = st.text_input("Nom colonne URL", "URL")
-            else:
-                # Configuration prédéfinie pour Semrush/Ahrefs
-                if data_source == "Semrush":
-                    col_mapping = {
-                        'keyword': 'Keyword',
-                        'domain': 'URL',  # On extraira le domaine de l'URL
-                        'position': 'Position',
-                        'volume': 'Search Volume',
-                        'difficulty': 'Keyword Difficulty',
-                        'intent': 'Keyword Intents',
-                        'url': 'URL'
-                    }
-                else:  # Ahrefs
-                    col_mapping = {
-                        'keyword': 'Keyword',
-                        'domain': 'Domain',
-                        'position': 'Position',
-                        'volume': 'Volume',
-                        'difficulty': 'KD',
-                        'intent': 'Intent',
-                        'url': 'URL'
-                    }
-            
-            # Section 2/3: Critères de filtrage
-            st.subheader("2. Critères Gap Content")
-            min_competitors = st.selectbox(
-                "Nombre minimum de concurrents positionnés",
-                [1, 2, 3]
-            )
-            
-            max_position = st.selectbox(
-                "Position maximum des concurrents",
-                [10, 20, 50]
-            )
-            
-            # Filtres supplémentaires
-            st.subheader("3. Filtres supplémentaires")
-            min_volume = st.number_input("Volume de recherche minimum", min_value=0, value=0)
-            max_difficulty = st.number_input("Difficulté maximum", min_value=0, max_value=100, value=100)
+        # Section 2: Configuration des colonnes (si Custom)
+        if data_source == "Custom":
+            st.subheader("2. Mapping des colonnes")
+            col_keyword = st.text_input("Nom colonne Mot-clé", "Keyword")
+            col_domain = st.text_input("Nom colonne Domaine", "Domain")
+            col_position = st.text_input("Nom colonne Position", "Position")
+            col_volume = st.text_input("Nom colonne Volume de recherche", "Search Volume")
+            col_difficulty = st.text_input("Nom colonne Difficulté", "Keyword Difficulty")
+            col_intent = st.text_input("Nom colonne Intention", "Keyword Intents")
+            col_url = st.text_input("Nom colonne URL", "URL")
+        else:
+            # Configuration prédéfinie pour Semrush/Ahrefs
+            if data_source == "Semrush":
+                col_mapping = {
+                    'keyword': 'Keyword',
+                    'domain': 'URL',  # On extraira le domaine de l'URL
+                    'position': 'Position',
+                    'volume': 'Search Volume',
+                    'difficulty': 'Keyword Difficulty',
+                    'intent': 'Keyword Intents',
+                    'url': 'URL'
+                }
+            else:  # Ahrefs
+                col_mapping = {
+                    'keyword': 'Keyword',
+                    'domain': 'Domain',
+                    'position': 'Position',
+                    'volume': 'Volume',
+                    'difficulty': 'KD',
+                    'intent': 'Intent',
+                    'url': 'URL'
+                }
+        
+        # Section 3: Critères de filtrage
+        st.subheader("2. Critères Gap Content" if data_source != "Custom" else "3. Critères Gap Content")
+        min_competitors = st.selectbox(
+            "Nombre minimum de concurrents positionnés",
+            [1, 2, 3]
+        )
+        
+        max_position = st.selectbox(
+            "Position maximum des concurrents",
+            [10, 20, 50]
+        )
+        
+        # Filtres supplémentaires
+        st.subheader("3. Filtres supplémentaires" if data_source != "Custom" else "4. Filtres supplémentaires")
+        min_volume = st.number_input("Volume de recherche minimum", min_value=0, value=0)
+        max_difficulty = st.number_input("Difficulté maximum", min_value=0, max_value=100, value=100)
 
     # Zone principale
     st.header("📁 Import des fichiers")
