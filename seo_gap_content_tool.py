@@ -164,14 +164,26 @@ def main():
 
 
 def extract_domain(url):
-    """Extrait le domaine d'une URL"""
+    """Extrait le domaine racine d'une URL (sans sous-domaines)"""
     try:
         if pd.isna(url) or url == '':
             return ''
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
         parsed = urlparse(url)
-        return parsed.netloc.lower()
+        domain = parsed.netloc.lower()
+        
+        # Extraire le domaine racine (enlever les sous-domaines)
+        domain_parts = domain.split('.')
+        if len(domain_parts) >= 2:
+            # Garder seulement les deux dernières parties (domaine.tld)
+            # Gérer les cas spéciaux comme .co.uk, .com.fr, etc.
+            if len(domain_parts) >= 3 and domain_parts[-2] in ['co', 'com', 'net', 'org', 'gov']:
+                root_domain = '.'.join(domain_parts[-3:])
+            else:
+                root_domain = '.'.join(domain_parts[-2:])
+            return root_domain
+        return domain
     except:
         return ''
 
@@ -243,7 +255,7 @@ def process_files(files, data_source, config):
 
 
 def extract_domain_from_data(df):
-    """Extrait le domaine principal du premier fichier"""
+    """Extrait le domaine racine principal du premier fichier"""
     if 'domain' in df.columns and not df['domain'].empty:
         # Prendre le domaine le plus fréquent
         return df['domain'].value_counts().index[0]
@@ -282,23 +294,30 @@ def perform_gap_analysis(data, main_domain, min_competitors, max_position, min_v
         # Critère de gap content : assez de concurrents positionnés MAIS domaine principal absent
         if competitor_count >= min_competitors and not main_domain_present:
             
+            # Trouver la meilleure position et l'URL correspondante
+            best_position = positioned_domains['position'].min()
+            best_url = positioned_domains[positioned_domains['position'] == best_position]['url'].iloc[0]
+            
             keyword_data = {
                 'keyword': keyword,
                 'volume': volume,
                 'difficulty': difficulty,
                 'intent': intent,
                 'competitor_count': competitor_count,
+                'best_position': best_position,
+                'best_url': best_url,
                 'total_domains': len(unique_domains)
             }
             
-            # Ajouter les positions et URLs de chaque domaine
+            # Ajouter les positions et URLs de chaque domaine racine
             for domain in unique_domains:
                 domain_data = positioned_domains[positioned_domains['domain'] == domain]
-                best_position = domain_data['position'].min()
-                best_url = domain_data[domain_data['position'] == best_position]['url'].iloc[0]
+                best_position_domain = domain_data['position'].min()
+                # Garder l'URL complète (avec sous-domaine) pour l'affichage
+                best_url_domain = domain_data[domain_data['position'] == best_position_domain]['url'].iloc[0]
                 
-                keyword_data[f'{domain}_position'] = best_position
-                keyword_data[f'{domain}_url'] = best_url
+                keyword_data[f'{domain}_position'] = best_position_domain
+                keyword_data[f'{domain}_url'] = best_url_domain
             
             keyword_analysis.append(keyword_data)
     
@@ -345,10 +364,20 @@ def generate_excel_report(analysis, main_domain):
         gap_df = analysis['gap_content'].copy()
         
         # Réorganiser les colonnes
-        base_cols = ['keyword', 'volume', 'difficulty', 'intent', 'competitor_count']
-        domain_cols = [col for col in gap_df.columns if '_position' in col or '_url' in col]
-        all_cols = base_cols + sorted(domain_cols)
+        base_cols = ['keyword', 'volume', 'difficulty', 'intent', 'competitor_count', 'best_position', 'best_url']
         
+        # Séparer les colonnes positions et URLs
+        position_cols = [col for col in gap_df.columns if col.endswith('_position')]
+        url_cols = [col for col in gap_df.columns if col.endswith('_url')]
+        
+        # Trier les domaines pour avoir un ordre cohérent
+        domains = sorted(list(set([col.replace('_position', '') for col in position_cols])))
+        
+        # Construire l'ordre des colonnes : base + toutes les positions + toutes les URLs
+        ordered_position_cols = [f'{domain}_position' for domain in domains if f'{domain}_position' in gap_df.columns]
+        ordered_url_cols = [f'{domain}_url' for domain in domains if f'{domain}_url' in gap_df.columns]
+        
+        all_cols = base_cols + ordered_position_cols + ordered_url_cols
         gap_df_display = gap_df[all_cols].copy()
         
         # Renommer les colonnes pour l'affichage
@@ -357,17 +386,17 @@ def generate_excel_report(analysis, main_domain):
             'volume': 'Volume de recherche',
             'difficulty': 'Difficulté concurrentielle',
             'intent': 'Intention de recherche',
-            'competitor_count': 'Nombre de sites présents'
+            'competitor_count': 'Nombre de sites présents',
+            'best_position': 'Meilleure position occupée',
+            'best_url': 'URL de la meilleure position'
         }
         
         # Ajouter les noms de domaines dans le mapping
-        for col in domain_cols:
-            if '_position' in col:
-                domain = col.replace('_position', '')
-                column_mapping[col] = f'{domain} (Position)'
-            elif '_url' in col:
-                domain = col.replace('_url', '')
-                column_mapping[col] = f'{domain} (URL)'
+        for domain in domains:
+            if f'{domain}_position' in gap_df.columns:
+                column_mapping[f'{domain}_position'] = f'{domain} (Position)'
+            if f'{domain}_url' in gap_df.columns:
+                column_mapping[f'{domain}_url'] = f'{domain} (URL)'
         
         gap_df_display = gap_df_display.rename(columns=column_mapping)
         
