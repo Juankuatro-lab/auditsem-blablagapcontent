@@ -382,10 +382,11 @@ def generate_excel_report(analysis, main_domain):
             cell.alignment = center_alignment
         
         # Ajustement des largeurs de colonnes
-        for column in ws_gap.columns:
+        for col_num in range(1, len(gap_df_display.columns) + 1):
+            column_letter = ws_gap.cell(row=1, column=col_num).column_letter
             max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
+            for row_num in range(1, ws_gap.max_row + 1):
+                cell = ws_gap.cell(row=row_num, column=col_num)
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
@@ -443,10 +444,11 @@ def generate_excel_report(analysis, main_domain):
                         cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
             
             # Ajustement des largeurs
-            for column in ws_domain.columns:
+            for col_num in range(1, 5):  # 4 colonnes : Mot-clé, Volume, Position, URL
+                column_letter = ws_domain.cell(row=3, column=col_num).column_letter
                 max_length = 0
-                column_letter = column[0].column_letter
-                for cell in column:
+                for row_num in range(1, ws_domain.max_row + 1):
+                    cell = ws_domain.cell(row=row_num, column=col_num)
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
