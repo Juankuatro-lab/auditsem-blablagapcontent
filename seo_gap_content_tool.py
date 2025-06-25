@@ -294,9 +294,9 @@ def perform_gap_analysis(data, main_domain, min_competitors, max_position, min_v
         # Critère de gap content : assez de concurrents positionnés MAIS domaine principal absent
         if competitor_count >= min_competitors and not main_domain_present:
             
-            # Trouver la meilleure position et l'URL correspondante
-            best_position = positioned_domains['position'].min()
-            best_url = positioned_domains[positioned_domains['position'] == best_position]['url'].iloc[0]
+            # Trouver la meilleure position globale et l'URL correspondante
+            global_best_position = positioned_domains['position'].min()
+            global_best_url = positioned_domains[positioned_domains['position'] == global_best_position]['url'].iloc[0]
             
             keyword_data = {
                 'keyword': keyword,
@@ -304,20 +304,20 @@ def perform_gap_analysis(data, main_domain, min_competitors, max_position, min_v
                 'difficulty': difficulty,
                 'intent': intent,
                 'competitor_count': competitor_count,
-                'best_position': best_position,
-                'best_url': best_url,
+                'best_position': global_best_position,
+                'best_url': global_best_url,
                 'total_domains': len(unique_domains)
             }
             
             # Ajouter les positions et URLs de chaque domaine racine
             for domain in unique_domains:
                 domain_data = positioned_domains[positioned_domains['domain'] == domain]
-                best_position_domain = domain_data['position'].min()
+                domain_best_position = domain_data['position'].min()
                 # Garder l'URL complète (avec sous-domaine) pour l'affichage
-                best_url_domain = domain_data[domain_data['position'] == best_position_domain]['url'].iloc[0]
+                domain_best_url = domain_data[domain_data['position'] == domain_best_position]['url'].iloc[0]
                 
-                keyword_data[f'{domain}_position'] = best_position_domain
-                keyword_data[f'{domain}_url'] = best_url_domain
+                keyword_data[f'{domain}_position'] = domain_best_position
+                keyword_data[f'{domain}_url'] = domain_best_url
             
             keyword_analysis.append(keyword_data)
     
