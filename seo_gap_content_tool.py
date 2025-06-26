@@ -3,7 +3,7 @@ def extract_domain_from_data(df):
     if 'domain' in df.columns and not df['domain'].empty:
         # Prendre le domaine le plus fréquent
         return df['domain'].value_counts().index[0]
-    return Noneimport streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 from urllib.parse import urlparse
