@@ -248,27 +248,34 @@ def load_file(file, data_source, config):
         if file.name.endswith('.csv'):
             # Détection automatique de l'encodage pour les CSV
             df = None
-            encodings_to_try = ['utf-8', 'utf-16', 'utf-8-sig', 'latin-1', 'cp1252']
+            encodings_to_try = ['utf-8', 'utf-16', 'utf-8-sig', 'latin-1', 'cp1252', 'utf-16-le', 'utf-16-be']
+            separators_to_try = [',', '\t', ';']
             
             for encoding in encodings_to_try:
-                try:
-                    # Reset du pointeur de fichier
-                    file.seek(0)
-                    df = pd.read_csv(file, encoding=encoding)
-                    st.success(f"Fichier {file.name} chargé avec l'encodage {encoding}")
+                for separator in separators_to_try:
+                    try:
+                        # Reset du pointeur de fichier
+                        file.seek(0)
+                        df = pd.read_csv(file, encoding=encoding, sep=separator)
+                        
+                        # Vérifier si le DataFrame a du sens (plus d'une colonne)
+                        if len(df.columns) > 1:
+                            st.success(f"Fichier {file.name} chargé avec l'encodage {encoding} et séparateur '{separator}'")
+                            break
+                    except (UnicodeDecodeError, UnicodeError, pd.errors.ParserError):
+                        continue
+                    except Exception as e:
+                        continue
+                if df is not None and len(df.columns) > 1:
                     break
-                except (UnicodeDecodeError, UnicodeError):
-                    continue
-                except Exception as e:
-                    # Si ce n'est pas une erreur d'encodage, on essaie l'encodage suivant
-                    continue
             
-            if df is None:
-                # Tentative avec détection automatique
+            if df is None or len(df.columns) <= 1:
+                # Tentative avec détection automatique Python
                 try:
                     file.seek(0)
-                    df = pd.read_csv(file, encoding='utf-8', errors='replace')
-                    st.warning(f"Encodage détecté automatiquement pour {file.name}, certains caractères peuvent être altérés")
+                    # Essayer avec engine python qui est plus permissif
+                    df = pd.read_csv(file, encoding='utf-8', sep=None, engine='python', error_bad_lines=False)
+                    st.warning(f"Fichier {file.name} chargé avec détection automatique")
                 except:
                     raise ValueError(f"Impossible de détecter l'encodage du fichier {file.name}")
         else:
@@ -316,7 +323,7 @@ def load_file(file, data_source, config):
                     column_mapping['keyword'] = col
                 elif 'volume' in col_lower and 'traffic' not in col_lower:
                     column_mapping['volume'] = col
-                elif 'position' in col_lower or 'rank' in col_lower:
+                elif ('position' in col_lower or 'rank' in col_lower) and 'average' in col_lower:
                     column_mapping['position'] = col
                 elif 'traffic' in col_lower and 'organic' in col_lower:
                     column_mapping['traffic'] = col
@@ -364,16 +371,27 @@ def load_file(file, data_source, config):
             raise ValueError(f"Colonnes manquantes après traitement: {missing_columns}")
         
         # Nettoyage des données
+        initial_count = len(df)
         df = df.dropna(subset=['keyword', 'domain'])
         df['position'] = pd.to_numeric(df['position'], errors='coerce')
         df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
         if 'difficulty' in df.columns:
             df['difficulty'] = pd.to_numeric(df['difficulty'], errors='coerce')
         
+        # Filtrer les lignes avec des positions invalides
+        df = df[df['position'] > 0]
+        
         # Ajout du nom du fichier
         df['source_file'] = file.name
         
-        st.success(f"Fichier {file.name} traité avec succès : {len(df)} lignes")
+        final_count = len(df)
+        st.success(f"Fichier {file.name} traité avec succès : {final_count}/{initial_count} lignes valides")
+        
+        # Debug : montrer quelques exemples de domaines extraits
+        if final_count > 0:
+            unique_domains = df['domain'].unique()
+            st.info(f"Domaines extraits de {file.name}: {list(unique_domains)}")
+        
         return df
         
     except Exception as e:
