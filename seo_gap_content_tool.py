@@ -80,12 +80,13 @@ def main():
             else:  # Ahrefs
                 col_mapping = {
                     'keyword': 'Keyword',
-                    'domain': 'Domain',
-                    'position': 'Position',
+                    'domain': None,  # Pas de colonne URL dans ce format, on utilisera le nom de fichier
+                    'position': 'Average position',
                     'volume': 'Volume',
-                    'difficulty': 'KD',
-                    'intent': 'Intent',
-                    'url': 'URL'
+                    'difficulty': None,  # Pas de difficulté dans ce format
+                    'intent': None,  # Pas d'intention dans ce format
+                    'url': None,  # Pas d'URL spécifique
+                    'traffic': 'Organic traffic'
                 }
         
         # Section 3: Critères de filtrage
@@ -262,9 +263,34 @@ def load_file(file, data_source, config):
                     'URL': 'url'
                 })
         elif data_source == "Ahrefs":
-            # Configuration à adapter selon le format Ahrefs réel
-            df['domain'] = df.get('URL', df.get('Domain', '')).apply(extract_domain)
-            # À compléter selon les colonnes Ahrefs
+            # Extraction du domaine depuis le nom du fichier pour Ahrefs
+            # Format attendu: www.example.com...xlsx
+            filename = file.name
+            if filename.startswith('www.'):
+                domain_from_filename = filename.split('fr')[0] if 'fr' in filename else filename.split('.xlsx')[0]
+                domain_from_filename = domain_from_filename.replace('www.', '').replace('.com', '.com')
+                if not domain_from_filename.endswith('.com'):
+                    domain_from_filename += '.com'
+            else:
+                domain_from_filename = 'unknown.com'
+            
+            df['domain'] = extract_domain(f"https://{domain_from_filename}")
+            df['url'] = f"https://{domain_from_filename}"  # URL générique
+            
+            # Renommer les colonnes Ahrefs
+            df = df.rename(columns={
+                'Keyword': 'keyword',
+                'Average position': 'position',
+                'Volume': 'volume',
+                'Organic traffic': 'traffic'
+            })
+            
+            # Ajouter des colonnes manquantes avec des valeurs par défaut
+            if 'difficulty' not in df.columns:
+                df['difficulty'] = 50  # Valeur par défaut
+            if 'intent' not in df.columns:
+                df['intent'] = 'unknown'  # Valeur par défaut
+                
         else:  # Custom
             df['domain'] = df[config.get('col_domain', 'URL')].apply(extract_domain)
             df = df.rename(columns={
@@ -280,7 +306,8 @@ def load_file(file, data_source, config):
         df = df.dropna(subset=['keyword', 'domain'])
         df['position'] = pd.to_numeric(df['position'], errors='coerce')
         df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
-        df['difficulty'] = pd.to_numeric(df['difficulty'], errors='coerce')
+        if 'difficulty' in df.columns:
+            df['difficulty'] = pd.to_numeric(df['difficulty'], errors='coerce')
         
         # Ajout du nom du fichier
         df['source_file'] = file.name
