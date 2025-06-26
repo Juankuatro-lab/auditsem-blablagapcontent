@@ -1,4 +1,9 @@
-import streamlit as st
+def extract_domain_from_data(df):
+    """Extrait le domaine racine principal du premier fichier"""
+    if 'domain' in df.columns and not df['domain'].empty:
+        # Prendre le domaine le plus fréquent
+        return df['domain'].value_counts().index[0]
+    return Noneimport streamlit as st
 import pandas as pd
 import numpy as np
 from urllib.parse import urlparse
@@ -91,23 +96,23 @@ def main():
         )
         
         # Position maximum avec curseur et saisie manuelle
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            max_position = st.slider(
-                "Position maximum",
-                min_value=1,
-                max_value=100,
-                value=10,
-                step=1
-            )
-        with col2:
-            max_position = st.number_input(
-                "Ou saisissez",
-                min_value=1,
-                max_value=100,
-                value=max_position,
-                step=1
-            )
+        st.write("Position maximum")
+        max_position = st.slider(
+            "",
+            min_value=1,
+            max_value=100,
+            value=10,
+            step=1,
+            label_visibility="collapsed"
+        )
+        
+        max_position = st.number_input(
+            "Saisissez manuellement",
+            min_value=1,
+            max_value=100,
+            value=max_position,
+            step=1
+        )
         
         # Filtres supplémentaires
         st.subheader("3. Filtres supplémentaires" if data_source != "Custom" else "4. Filtres supplémentaires")
@@ -117,7 +122,7 @@ def main():
         # Filtre termes de marque
         brand_terms = st.text_input(
             "Termes de marque (séparés par des virgules)",
-            placeholder="marque1, marque2, brand3",
+            placeholder="marque1, marque2, marque3",
             help="Mots-clés contenant ces termes seront filtrés de l'analyse"
         )
 
