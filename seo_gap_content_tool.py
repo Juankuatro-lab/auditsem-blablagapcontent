@@ -90,15 +90,36 @@ def main():
             [1, 2, 3]
         )
         
-        max_position = st.selectbox(
-            "Position maximum des concurrents",
-            [10, 20, 50]
-        )
+        # Position maximum avec curseur et saisie manuelle
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            max_position = st.slider(
+                "Position maximum",
+                min_value=1,
+                max_value=100,
+                value=10,
+                step=1
+            )
+        with col2:
+            max_position = st.number_input(
+                "Ou saisissez",
+                min_value=1,
+                max_value=100,
+                value=max_position,
+                step=1
+            )
         
         # Filtres supplémentaires
         st.subheader("3. Filtres supplémentaires" if data_source != "Custom" else "4. Filtres supplémentaires")
         min_volume = st.number_input("Volume de recherche minimum", min_value=0, value=0)
         max_difficulty = st.number_input("Difficulté maximum", min_value=0, max_value=100, value=100)
+        
+        # Filtre termes de marque
+        brand_terms = st.text_input(
+            "Termes de marque (séparés par des virgules)",
+            placeholder="marque1, marque2, brand3",
+            help="Mots-clés contenant ces termes seront filtrés de l'analyse"
+        )
 
     # Zone principale
     st.header("📁 Import des fichiers")
@@ -139,6 +160,10 @@ def main():
                         if not first_file_data.empty:
                             main_domain = extract_domain_from_data(first_file_data)
                     
+                    # Filtrage des termes de marque
+                    if brand_terms.strip():
+                        all_data = filter_brand_terms(all_data, brand_terms)
+                    
                     # Analyse du gap content
                     gap_analysis = perform_gap_analysis(
                         all_data, 
@@ -149,11 +174,14 @@ def main():
                         max_difficulty
                     )
                     
+                    # Analyse du domaine principal
+                    main_domain_analysis = analyze_main_domain(all_data, main_domain) if main_domain else None
+                    
                     if gap_analysis['gap_content'].empty:
                         st.warning("Aucune opportunité de gap content trouvée avec ces critères.")
                     else:
                         # Génération du fichier Excel
-                        excel_file = generate_excel_report(gap_analysis, main_domain)
+                        excel_file = generate_excel_report(gap_analysis, main_domain, main_domain_analysis)
                         
                         # Affichage d'un résumé simple
                         st.success(f"Analyse terminée ! {len(gap_analysis['gap_content'])} opportunités trouvées.")
@@ -274,7 +302,63 @@ def process_files(files, data_source, config):
         return pd.DataFrame()
 
 
-def extract_domain_from_data(df):
+def filter_brand_terms(data, brand_terms):
+    """Filtre les mots-clés contenant des termes de marque"""
+    if not brand_terms.strip():
+        return data
+    
+    # Nettoyer et séparer les termes
+    terms = [term.strip().lower() for term in brand_terms.split(',') if term.strip()]
+    
+    if not terms:
+        return data
+    
+    # Filtrer les mots-clés contenant ces termes
+    def contains_brand_term(keyword):
+        if pd.isna(keyword):
+            return False
+        keyword_lower = str(keyword).lower()
+        return any(term in keyword_lower for term in terms)
+    
+    # Garder seulement les mots-clés qui ne contiennent pas de termes de marque
+    filtered_data = data[~data['keyword'].apply(contains_brand_term)]
+    
+    return filtered_data
+
+
+def analyze_main_domain(data, main_domain):
+    """Analyse le positionnement du domaine principal"""
+    if not main_domain:
+        return None
+    
+    # Filtrer les données du domaine principal
+    main_data = data[data['domain'] == main_domain].copy()
+    
+    if main_data.empty:
+        return None
+    
+    # Catégoriser par position
+    categories = {
+        'Sauvegarde': main_data[(main_data['position'] >= 1) & (main_data['position'] <= 3)],
+        'Quick Win': main_data[(main_data['position'] >= 4) & (main_data['position'] <= 5)],
+        'Opportunité': main_data[(main_data['position'] >= 6) & (main_data['position'] <= 10)],
+        'Potentiel': main_data[(main_data['position'] >= 11) & (main_data['position'] <= 20)],
+        'Conquête': main_data[(main_data['position'] >= 21) & (main_data['position'] <= 100)]
+    }
+    
+    # Analyser les mots-clés non positionnés (présents chez les concurrents mais pas chez nous)
+    all_keywords = set(data['keyword'].unique())
+    main_keywords = set(main_data['keyword'].unique())
+    non_positioned = all_keywords - main_keywords
+    
+    # Récupérer les données des mots-clés non positionnés
+    non_positioned_data = data[data['keyword'].isin(non_positioned)].drop_duplicates('keyword')
+    
+    return {
+        'categories': categories,
+        'non_positioned': non_positioned_data,
+        'main_domain': main_domain
+    }
     """Extrait le domaine racine principal du premier fichier"""
     if 'domain' in df.columns and not df['domain'].empty:
         # Prendre le domaine le plus fréquent
@@ -364,7 +448,7 @@ def display_results(analysis):
     pass  # Fonction supprimée - seuls les résultats Excel sont nécessaires
 
 
-def generate_excel_report(analysis, main_domain):
+def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
     """Génère le rapport Excel avec mise en forme"""
     
     output = io.BytesIO()
@@ -444,7 +528,107 @@ def generate_excel_report(analysis, main_domain):
             adjusted_width = min(max_length + 2, 50)
             ws_gap.column_dimensions[column_letter].width = adjusted_width
     
-    # 2. Onglets pour chaque domaine concurrent
+    # 2. Onglet récapitulatif du domaine principal
+    if main_domain_analysis:
+        ws_main = workbook.create_sheet(f"Analyse {main_domain}")
+        
+        # Titre principal
+        ws_main.append([f"Analyse de positionnement - {main_domain}"])
+        ws_main['A1'].font = Font(size=18, bold=True)
+        ws_main.merge_cells('A1:D1')
+        ws_main.append([])
+        
+        current_row = 3
+        
+        # Pour chaque catégorie
+        categories_order = ['Sauvegarde', 'Quick Win', 'Opportunité', 'Potentiel', 'Conquête']
+        position_ranges = {
+            'Sauvegarde': '1-3',
+            'Quick Win': '4-5', 
+            'Opportunité': '6-10',
+            'Potentiel': '11-20',
+            'Conquête': '21-100'
+        }
+        
+        for category in categories_order:
+            cat_data = main_domain_analysis['categories'][category]
+            
+            if not cat_data.empty:
+                # Titre de catégorie
+                ws_main.append([f"{category} (Positions {position_ranges[category]}) - {len(cat_data)} mots-clés"])
+                ws_main[f'A{current_row}'].font = Font(size=14, bold=True)
+                current_row += 1
+                
+                # En-têtes
+                headers = ['Mot-clé', 'Volume de recherche', 'Position', 'URL']
+                ws_main.append(headers)
+                for cell in ws_main[current_row]:
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = center_alignment
+                current_row += 1
+                
+                # Données triées par position puis volume
+                sorted_data = cat_data.sort_values(['position', 'volume'], ascending=[True, False])
+                for _, row in sorted_data.iterrows():
+                    ws_main.append([row['keyword'], row['volume'], row['position'], row['url']])
+                    current_row += 1
+                
+                # Mise en forme conditionnelle des volumes
+                if len(sorted_data) > 0:
+                    min_volume = sorted_data['volume'].min()
+                    max_volume = sorted_data['volume'].max()
+                    
+                    start_row = current_row - len(sorted_data)
+                    for row_num in range(start_row, current_row):
+                        cell = ws_main[f'B{row_num}']
+                        volume = cell.value
+                        if volume and max_volume > min_volume:
+                            intensity = (volume - min_volume) / (max_volume - min_volume)
+                            green_value = int(255 - (intensity * 100))
+                            color = f"FF{green_value:02X}FF{green_value:02X}"
+                            cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                
+                ws_main.append([])  # Ligne vide
+                current_row += 1
+        
+        # Section Non positionné
+        non_pos_data = main_domain_analysis['non_positioned']
+        if not non_pos_data.empty:
+            ws_main.append([f"Non positionné - {len(non_pos_data)} mots-clés"])
+            ws_main[f'A{current_row}'].font = Font(size=14, bold=True)
+            current_row += 1
+            
+            # En-têtes
+            headers = ['Mot-clé', 'Volume de recherche', 'Difficulté', 'Intention']
+            ws_main.append(headers)
+            for cell in ws_main[current_row]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center_alignment
+            current_row += 1
+            
+            # Données triées par volume
+            sorted_data = non_pos_data.sort_values('volume', ascending=False)
+            for _, row in sorted_data.iterrows():
+                ws_main.append([row['keyword'], row['volume'], row.get('difficulty', ''), row.get('intent', '')])
+                current_row += 1
+        
+        # Ajustement des largeurs
+        for col_num in range(1, 5):
+            column_letter = ws_main.cell(row=3, column=col_num).column_letter
+            max_length = 0
+            for row_num in range(1, ws_main.max_row + 1):
+                cell = ws_main.cell(row=row_num, column=col_num)
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws_main.column_dimensions[column_letter].width = adjusted_width
+    
+    # 3. Onglets pour chaque domaine concurrent
     for domain, domain_data in analysis['domain_reports'].items():
         if not domain_data.empty:
             # Créer un nom d'onglet valide (max 31 caractères)
