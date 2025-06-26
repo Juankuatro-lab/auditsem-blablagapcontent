@@ -344,7 +344,7 @@ def load_file(file, data_source, config):
                 col_lower = col.lower().strip()
                 if 'keyword' in col_lower:
                     column_mapping['keyword'] = col
-                elif 'volume' in col_lower and 'traffic' not in col_lower:
+                elif 'volume' in col_lower and 'traffic' not in col_lower and 'location' not in col_lower:
                     column_mapping['volume'] = col
                 elif ('position' in col_lower or 'rank' in col_lower) and 'average' in col_lower:
                     column_mapping['position'] = col
@@ -352,6 +352,9 @@ def load_file(file, data_source, config):
                     column_mapping['traffic'] = col
                 elif 'difficulty' in col_lower or 'kd' in col_lower:
                     column_mapping['difficulty'] = col
+            
+            # Debug : afficher le mapping trouvé
+            st.info(f"Mapping des colonnes pour {filename}: {column_mapping}")
             
             # Renommer les colonnes trouvées
             if column_mapping:
@@ -366,15 +369,25 @@ def load_file(file, data_source, config):
                 else:
                     raise ValueError(f"Impossible de trouver une colonne 'keyword' dans {file.name}")
             
+            # Vérifier si la colonne volume existe et est correcte
+            if 'volume' not in df.columns:
+                # Chercher d'autres colonnes possibles pour le volume
+                possible_volume_cols = [col for col in df.columns if 'volume' in col.lower() and 'location' not in col.lower()]
+                if possible_volume_cols:
+                    df = df.rename(columns={possible_volume_cols[0]: 'volume'})
+                    st.info(f"Colonne volume trouvée: {possible_volume_cols[0]} → volume")
+                else:
+                    df['volume'] = 0  # Valeur par défaut
+                    st.warning(f"Aucune colonne volume trouvée dans {filename}, utilisation de 0 par défaut")
+            
             # Ajouter des colonnes manquantes avec des valeurs par défaut
             if 'difficulty' not in df.columns:
                 df['difficulty'] = 50  # Valeur par défaut
             if 'intent' not in df.columns:
                 df['intent'] = 'unknown'  # Valeur par défaut
-            if 'volume' not in df.columns:
-                df['volume'] = 0  # Valeur par défaut
             if 'position' not in df.columns:
                 df['position'] = 50  # Valeur par défaut
+                st.warning(f"Aucune colonne position trouvée dans {filename}, utilisation de 50 par défaut")
                 
         else:  # Custom
             df['domain'] = df[config.get('col_domain', 'URL')].apply(extract_domain)
@@ -396,24 +409,29 @@ def load_file(file, data_source, config):
         # Nettoyage des données
         initial_count = len(df)
         df = df.dropna(subset=['keyword', 'domain'])
-        df['position'] = pd.to_numeric(df['position'], errors='coerce')
-        df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
+        
+        # Conversion numérique avec debug
+        if 'position' in df.columns:
+            df['position'] = pd.to_numeric(df['position'], errors='coerce')
+            st.info(f"Positions dans {file.name}: min={df['position'].min()}, max={df['position'].max()}, sample={df['position'].head(3).tolist()}")
+        
+        if 'volume' in df.columns:
+            df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
+            df['volume'] = df['volume'].fillna(0)  # Remplacer NaN par 0
+            st.info(f"Volumes dans {file.name}: min={df['volume'].min()}, max={df['volume'].max()}, sample={df['volume'].head(3).tolist()}")
+        
         if 'difficulty' in df.columns:
             df['difficulty'] = pd.to_numeric(df['difficulty'], errors='coerce')
         
         # Filtrer les lignes avec des positions invalides
-        df = df[df['position'] > 0]
+        if 'position' in df.columns:
+            df = df[df['position'] > 0]
         
         # Ajout du nom du fichier
         df['source_file'] = file.name
         
         final_count = len(df)
         st.success(f"Fichier {file.name} traité avec succès : {final_count}/{initial_count} lignes valides")
-        
-        # Debug : montrer quelques exemples de domaines extraits
-        if final_count > 0:
-            unique_domains = df['domain'].unique()
-            st.info(f"Domaine final normalisé pour {file.name}: {list(unique_domains)}")
         
         return df
         
