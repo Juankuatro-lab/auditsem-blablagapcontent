@@ -302,16 +302,39 @@ def load_file(file, data_source, config):
             filename = file.name
             domain_from_filename = 'unknown.com'
             
-            # Extraction du domaine depuis le nom de fichier
-            if 'www.' in filename:
+            # Extraction améliorée du domaine depuis le nom de fichier
+            if '-organic' in filename:
                 domain_part = filename.split('-organic')[0]  # Prendre la partie avant "-organic"
+                
+                # Nettoyer le domaine extrait
+                if domain_part.startswith('www.'):
+                    domain_part = domain_part[4:]  # Enlever "www."
+                
+                # Gérer les cas spéciaux comme "invivo-group.com-fr"
+                if domain_part.endswith('-fr'):
+                    domain_part = domain_part[:-3]  # Enlever "-fr"
+                elif domain_part.endswith('.com-fr'):
+                    domain_part = domain_part.replace('.com-fr', '.com')
+                elif domain_part.endswith('.fr-fr'):
+                    domain_part = domain_part.replace('.fr-fr', '.fr')
+                
                 domain_from_filename = domain_part
             elif '.' in filename:
-                domain_part = filename.split('-organic')[0]
+                # Fallback : prendre la partie avant le premier tiret ou espace
+                domain_part = filename.split('-')[0].split('_')[0].split(' ')[0]
+                if domain_part.startswith('www.'):
+                    domain_part = domain_part[4:]
                 domain_from_filename = domain_part
+            
+            # S'assurer que le domaine a une extension valide
+            if not ('.' in domain_from_filename and any(ext in domain_from_filename for ext in ['.com', '.fr', '.org', '.net', '.coop'])):
+                domain_from_filename = domain_from_filename + '.com'
             
             df['domain'] = extract_domain(f"https://{domain_from_filename}")
             df['url'] = f"https://{domain_from_filename}"  # URL générique
+            
+            # Debug : afficher le domaine extrait
+            st.info(f"Domaine extrait pour {filename}: {domain_from_filename} → {df['domain'].iloc[0] if len(df) > 0 else 'N/A'}")
             
             # Mapping flexible des colonnes Ahrefs (CSV vs Excel peuvent différer)
             column_mapping = {}
@@ -390,7 +413,7 @@ def load_file(file, data_source, config):
         # Debug : montrer quelques exemples de domaines extraits
         if final_count > 0:
             unique_domains = df['domain'].unique()
-            st.info(f"Domaines extraits de {file.name}: {list(unique_domains)}")
+            st.info(f"Domaine final normalisé pour {file.name}: {list(unique_domains)}")
         
         return df
         
