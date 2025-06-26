@@ -246,8 +246,33 @@ def load_file(file, data_source, config):
     """Charge un fichier CSV ou Excel et normalise les colonnes"""
     try:
         if file.name.endswith('.csv'):
-            df = pd.read_csv(file)
+            # Détection automatique de l'encodage pour les CSV
+            df = None
+            encodings_to_try = ['utf-8', 'utf-16', 'utf-8-sig', 'latin-1', 'cp1252']
+            
+            for encoding in encodings_to_try:
+                try:
+                    # Reset du pointeur de fichier
+                    file.seek(0)
+                    df = pd.read_csv(file, encoding=encoding)
+                    st.success(f"Fichier {file.name} chargé avec l'encodage {encoding}")
+                    break
+                except (UnicodeDecodeError, UnicodeError):
+                    continue
+                except Exception as e:
+                    # Si ce n'est pas une erreur d'encodage, on essaie l'encodage suivant
+                    continue
+            
+            if df is None:
+                # Tentative avec détection automatique
+                try:
+                    file.seek(0)
+                    df = pd.read_csv(file, encoding='utf-8', errors='replace')
+                    st.warning(f"Encodage détecté automatiquement pour {file.name}, certains caractères peuvent être altérés")
+                except:
+                    raise ValueError(f"Impossible de détecter l'encodage du fichier {file.name}")
         else:
+            # Pour les fichiers Excel, pandas gère automatiquement l'encodage
             df = pd.read_excel(file)
         
         # Normalisation des colonnes selon la source
