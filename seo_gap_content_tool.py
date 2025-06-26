@@ -275,6 +275,9 @@ def load_file(file, data_source, config):
             # Pour les fichiers Excel, pandas gère automatiquement l'encodage
             df = pd.read_excel(file)
         
+        # Debug : afficher les colonnes disponibles
+        st.info(f"Colonnes détectées dans {file.name}: {list(df.columns)}")
+        
         # Normalisation des colonnes selon la source
         if data_source == "Semrush":
             if 'Keyword' in df.columns:
@@ -289,32 +292,59 @@ def load_file(file, data_source, config):
                 })
         elif data_source == "Ahrefs":
             # Extraction du domaine depuis le nom du fichier pour Ahrefs
-            # Format attendu: www.example.com...xlsx
             filename = file.name
-            if filename.startswith('www.'):
-                domain_from_filename = filename.split('fr')[0] if 'fr' in filename else filename.split('.xlsx')[0]
-                domain_from_filename = domain_from_filename.replace('www.', '').replace('.com', '.com')
-                if not domain_from_filename.endswith('.com'):
-                    domain_from_filename += '.com'
-            else:
-                domain_from_filename = 'unknown.com'
+            domain_from_filename = 'unknown.com'
+            
+            # Extraction du domaine depuis le nom de fichier
+            if 'www.' in filename:
+                domain_part = filename.split('-organic')[0]  # Prendre la partie avant "-organic"
+                domain_from_filename = domain_part
+            elif '.' in filename:
+                domain_part = filename.split('-organic')[0]
+                domain_from_filename = domain_part
             
             df['domain'] = extract_domain(f"https://{domain_from_filename}")
             df['url'] = f"https://{domain_from_filename}"  # URL générique
             
-            # Renommer les colonnes Ahrefs
-            df = df.rename(columns={
-                'Keyword': 'keyword',
-                'Average position': 'position',
-                'Volume': 'volume',
-                'Organic traffic': 'traffic'
-            })
+            # Mapping flexible des colonnes Ahrefs (CSV vs Excel peuvent différer)
+            column_mapping = {}
+            
+            # Chercher les colonnes par nom (insensible à la casse)
+            for col in df.columns:
+                col_lower = col.lower().strip()
+                if 'keyword' in col_lower:
+                    column_mapping['keyword'] = col
+                elif 'volume' in col_lower and 'traffic' not in col_lower:
+                    column_mapping['volume'] = col
+                elif 'position' in col_lower or 'rank' in col_lower:
+                    column_mapping['position'] = col
+                elif 'traffic' in col_lower and 'organic' in col_lower:
+                    column_mapping['traffic'] = col
+                elif 'difficulty' in col_lower or 'kd' in col_lower:
+                    column_mapping['difficulty'] = col
+            
+            # Renommer les colonnes trouvées
+            if column_mapping:
+                df = df.rename(columns=column_mapping)
+            
+            # S'assurer que les colonnes essentielles existent
+            if 'keyword' not in df.columns:
+                # Essayer de trouver une colonne qui pourrait être le mot-clé
+                possible_keyword_cols = [col for col in df.columns if any(term in col.lower() for term in ['keyword', 'query', 'term'])]
+                if possible_keyword_cols:
+                    df = df.rename(columns={possible_keyword_cols[0]: 'keyword'})
+                else:
+                    raise ValueError(f"Impossible de trouver une colonne 'keyword' dans {file.name}")
             
             # Ajouter des colonnes manquantes avec des valeurs par défaut
             if 'difficulty' not in df.columns:
                 df['difficulty'] = 50  # Valeur par défaut
             if 'intent' not in df.columns:
                 df['intent'] = 'unknown'  # Valeur par défaut
+            if 'volume' not in df.columns:
+                df['volume'] = 0  # Valeur par défaut
+            if 'position' not in df.columns:
+                df['position'] = 50  # Valeur par défaut
                 
         else:  # Custom
             df['domain'] = df[config.get('col_domain', 'URL')].apply(extract_domain)
@@ -327,6 +357,12 @@ def load_file(file, data_source, config):
                 config.get('col_url', 'URL'): 'url'
             })
         
+        # Vérification finale des colonnes essentielles
+        required_columns = ['keyword', 'domain']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Colonnes manquantes après traitement: {missing_columns}")
+        
         # Nettoyage des données
         df = df.dropna(subset=['keyword', 'domain'])
         df['position'] = pd.to_numeric(df['position'], errors='coerce')
@@ -337,6 +373,7 @@ def load_file(file, data_source, config):
         # Ajout du nom du fichier
         df['source_file'] = file.name
         
+        st.success(f"Fichier {file.name} traité avec succès : {len(df)} lignes")
         return df
         
     except Exception as e:
