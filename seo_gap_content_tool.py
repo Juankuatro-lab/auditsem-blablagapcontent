@@ -553,17 +553,20 @@ def perform_gap_analysis(data, main_domain, min_competitors, max_position, min_v
         # Critère de gap content : assez de concurrents positionnés MAIS domaine principal absent
         if competitor_count >= min_competitors and not main_domain_present:
             
+            # Trouver la meilleure position globale et l'URL correspondante (IMPORTANT - pas un doublon !)
+            global_best_position = positioned_domains['position'].min()
+            global_best_url = positioned_domains[positioned_domains['position'] == global_best_position]['url'].iloc[0]
+            
             keyword_data = {
                 'keyword': keyword,
                 'volume': volume,
                 'difficulty': difficulty,
                 'intent': intent,
                 'competitor_count': competitor_count,
+                'best_position': global_best_position,  # Meilleure position parmi TOUS les concurrents
+                'best_url': global_best_url,  # URL de cette meilleure position
                 'total_domains': len(unique_domains)
             }
-            
-            # CORRECTION 1: Supprimer les colonnes "best" redondantes
-            # On ne garde que les positions et URLs spécifiques par domaine
             
             # CORRECTION 2: Ajouter une colonne pour le domaine principal même s'il n'est pas positionné
             if main_domain:
@@ -632,7 +635,7 @@ def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
         gap_df = analysis['gap_content'].copy()
         
         # CORRECTION 3: Réorganiser les colonnes en mettant le domaine principal EN PREMIER
-        base_cols = ['keyword', 'volume', 'difficulty', 'intent', 'competitor_count']
+        base_cols = ['keyword', 'volume', 'difficulty', 'intent', 'competitor_count', 'best_position', 'best_url']
         
         # Identifier tous les domaines
         position_columns = [col for col in gap_df.columns if col.endswith('_position')]
@@ -670,7 +673,9 @@ def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
             'volume': 'Volume de recherche',
             'difficulty': 'Difficulté concurrentielle',
             'intent': 'Intention de recherche',
-            'competitor_count': 'Nombre de concurrents positionnés'
+            'competitor_count': 'Nombre de concurrents positionnés',
+            'best_position': 'Meilleure position globale',
+            'best_url': 'URL de la meilleure position'
         }
         
         # Ajouter les noms de domaines dans le mapping
