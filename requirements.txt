@@ -21,8 +21,10 @@ urllib3>=2.0.0
 # Utilitaires pour les dates
 python-dateutil>=2.8.0
 
-# Optionnel : pour des graphiques plus avancés
-# plotly>=5.15.0
+# Graphiques interactifs (requis pour les visualisations)
+plotly>=5.15.0
+
+# Optionnel : pour des graphiques alternatifs
 # altair>=5.0.0
 
 # Optionnel : pour l'analyse de texte avancée
