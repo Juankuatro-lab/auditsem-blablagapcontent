@@ -13,6 +13,9 @@ from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
 import zipfile
 from datetime import datetime
+import math
+import plotly.express as px
+from io import BytesIO
 
 def main():
     st.set_page_config(
@@ -620,15 +623,24 @@ def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
         ws_gap = workbook.create_sheet("Gap Content Analysis")
         gap_df = analysis['gap_content'].copy()
         
-        # Réorganiser les colonnes
-        base_cols = ['keyword', 'volume', 'difficulty', 'intent', 'competitor_count', 'best_position', 'best_url']
+        # Réorganiser les colonnes : keyword, volume, difficulty, intent, puis toutes les positions
+        base_columns = ['keyword', 'volume', 'difficulty', 'intent']
+        position_columns = [col for col in gap_df.columns if col.endswith('_position')]
+        url_columns = [col for col in gap_df.columns if col.endswith('_url')]
         
-        # Séparer les colonnes positions et URLs
-        position_cols = [col for col in gap_df.columns if col.endswith('_position')]
-        url_cols = [col for col in gap_df.columns if col.endswith('_url')]
+        # Trier les domaines pour avoir un ordre cohérent avec le domaine principal en premier
+        domains = []
+        main_domain_clean = main_domain.replace('.', '_').replace('-', '_') if main_domain else None
         
-        # Trier les domaines pour avoir un ordre cohérent
-        domains = sorted(list(set([col.replace('_position', '') for col in position_cols])))
+        # Ajouter le domaine principal en premier s'il existe
+        if main_domain_clean and f'{main_domain_clean}_position' in gap_df.columns:
+            domains.append(main_domain_clean)
+        
+        # Ajouter les autres domaines
+        all_domain_positions = [col.replace('_position', '') for col in position_columns]
+        for domain in sorted(all_domain_positions):
+            if domain != main_domain_clean and domain not in domains:
+                domains.append(domain)
         
         # Construire l'ordre des colonnes : base + toutes les positions + toutes les URLs
         ordered_position_cols = [f'{domain}_position' for domain in domains if f'{domain}_position' in gap_df.columns]
@@ -650,10 +662,11 @@ def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
         
         # Ajouter les noms de domaines dans le mapping
         for domain in domains:
+            domain_name = domain.replace('_', '.')
             if f'{domain}_position' in gap_df.columns:
-                column_mapping[f'{domain}_position'] = f'{domain} (Position)'
+                column_mapping[f'{domain}_position'] = f'{domain_name} (Position)'
             if f'{domain}_url' in gap_df.columns:
-                column_mapping[f'{domain}_url'] = f'{domain} (URL)'
+                column_mapping[f'{domain}_url'] = f'{domain_name} (URL)'
         
         gap_df_display = gap_df_display.rename(columns=column_mapping)
         
