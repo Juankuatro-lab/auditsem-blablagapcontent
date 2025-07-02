@@ -615,7 +615,7 @@ def perform_gap_analysis(data, main_domain, min_competitors, max_position, min_v
 
 
 def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
-    """Génère le rapport Excel avec mise en forme - VERSION CORRIGÉE"""
+    """Génère le rapport Excel avec mise en forme - VERSION CORRIGÉE AVEC ESTHÉTIQUE"""
     
     output = io.BytesIO()
     workbook = Workbook()
@@ -626,8 +626,43 @@ def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
     # Styles
     header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True)
-    main_domain_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")  # Vert clair pour domaine principal
+    main_domain_fill = PatternFill(start_color="FFFFB7", end_color="FFFFB7", fill_type="solid")  # Jaune pour domaine principal
     center_alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Couleurs pour les intentions de recherche
+    intent_colors = {
+        'informational': 'ADE8F4',
+        'commercial': 'FFFFB7', 
+        'transactional': 'D8F3DC',
+        'navigational': 'B79CED'
+    }
+    
+    def hex_to_rgb(hex_color):
+        """Convertit une couleur hex en RGB"""
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def rgb_to_hex(rgb):
+        """Convertit RGB en hex"""
+        return f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
+    
+    def interpolate_color(color1_hex, color2_hex, factor):
+        """Interpole entre deux couleurs (factor entre 0 et 1)"""
+        rgb1 = hex_to_rgb(color1_hex)
+        rgb2 = hex_to_rgb(color2_hex)
+        
+        interpolated = tuple(
+            int(rgb1[i] + factor * (rgb2[i] - rgb1[i]))
+            for i in range(3)
+        )
+        return rgb_to_hex(interpolated)
+    
+    def get_gradient_color(value, min_val, max_val, min_color, max_color):
+        """Calcule la couleur dans un dégradé selon la valeur"""
+        if max_val == min_val:
+            return min_color
+        factor = (value - min_val) / (max_val - min_val)
+        return interpolate_color(min_color, max_color, factor)
     
     # 1. Onglet Gap Content Analysis - VERSION CORRIGÉE
     if not analysis['gap_content'].empty:
@@ -704,23 +739,110 @@ def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
             cell.font = header_font
             cell.alignment = center_alignment
             
-            # CORRECTION 2: Mise en forme spéciale pour les colonnes du domaine principal
+            # Mise en forme spéciale pour les colonnes du domaine principal
             if main_domain and (f'🏠 {main_domain}' in str(cell.value)):
                 cell.fill = main_domain_fill
-                cell.font = Font(color="000000", bold=True)  # Texte noir sur fond vert
+                cell.font = Font(color="000000", bold=True)  # Texte noir sur fond jaune
         
-        # Mise en forme des données - colonnes du domaine principal en vert clair
-        if main_domain:
-            main_domain_col_indices = []
+        # NOUVELLES MISES EN FORME ESTHÉTIQUES
+        
+        # 1. Préparation des données pour les dégradés
+        if len(gap_df_display) > 0:
+            # Trouver les colonnes par leur nom français
+            col_indices = {}
             for col_idx, cell in enumerate(ws_gap[1], 1):
-                if f'🏠 {main_domain}' in str(cell.value):
-                    main_domain_col_indices.append(col_idx)
+                col_name = str(cell.value)
+                if col_name == 'Nombre de concurrents positionnés':
+                    col_indices['competitors'] = col_idx
+                elif col_name == 'Intention de recherche':
+                    col_indices['intent'] = col_idx
+                elif col_name == 'Difficulté concurrentielle':
+                    col_indices['difficulty'] = col_idx
+                elif col_name == 'Volume de recherche':
+                    col_indices['volume'] = col_idx
+                elif main_domain and f'🏠 {main_domain}' in col_name:
+                    if 'main_domain_cols' not in col_indices:
+                        col_indices['main_domain_cols'] = []
+                    col_indices['main_domain_cols'].append(col_idx)
             
-            # Appliquer le fond vert clair aux données du domaine principal
+            # Calculer les valeurs min/max pour les dégradés
+            if 'competitors' in col_indices:
+                competitor_values = [ws_gap.cell(row=i, column=col_indices['competitors']).value 
+                                   for i in range(2, ws_gap.max_row + 1)]
+                competitor_values = [v for v in competitor_values if v is not None]
+                if competitor_values:
+                    min_competitors = min(competitor_values)
+                    max_competitors = max(competitor_values)
+            
+            if 'difficulty' in col_indices:
+                difficulty_values = [ws_gap.cell(row=i, column=col_indices['difficulty']).value 
+                                   for i in range(2, ws_gap.max_row + 1)]
+                difficulty_values = [v for v in difficulty_values if v is not None and str(v).replace('.','').isdigit()]
+                if difficulty_values:
+                    min_difficulty = min(difficulty_values)
+                    max_difficulty = max(difficulty_values)
+                    median_difficulty = sorted(difficulty_values)[len(difficulty_values)//2]
+            
+            if 'volume' in col_indices:
+                volume_values = [ws_gap.cell(row=i, column=col_indices['volume']).value 
+                               for i in range(2, ws_gap.max_row + 1)]
+                volume_values = [v for v in volume_values if v is not None and str(v).replace('.','').isdigit()]
+                if volume_values:
+                    min_volume = min(volume_values)
+                    max_volume = max(volume_values)
+            
+            # 2. Application des couleurs ligne par ligne
             for row_idx in range(2, ws_gap.max_row + 1):
-                for col_idx in main_domain_col_indices:
-                    cell = ws_gap.cell(row=row_idx, column=col_idx)
-                    cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")  # Vert très clair
+                
+                # Coloration "Nombre de concurrents positionnés"
+                if 'competitors' in col_indices and competitor_values:
+                    cell = ws_gap.cell(row=row_idx, column=col_indices['competitors'])
+                    if cell.value is not None:
+                        color = get_gradient_color(cell.value, min_competitors, max_competitors, 
+                                                 'F6CACC', 'DD2C2F')
+                        cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                
+                # Coloration "Intention de recherche"
+                if 'intent' in col_indices:
+                    cell = ws_gap.cell(row=row_idx, column=col_indices['intent'])
+                    if cell.value is not None:
+                        intent_value = str(cell.value).lower().split(',')[0].strip()  # Première valeur avant la virgule
+                        if intent_value in intent_colors:
+                            color = intent_colors[intent_value]
+                            cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                
+                # Coloration "Difficulté concurrentielle"
+                if 'difficulty' in col_indices and difficulty_values:
+                    cell = ws_gap.cell(row=row_idx, column=col_indices['difficulty'])
+                    if cell.value is not None and str(cell.value).replace('.','').isdigit():
+                        difficulty_val = float(cell.value)
+                        if difficulty_val <= median_difficulty:
+                            # Du minimum (vert) vers la médiane (jaune)
+                            factor = (difficulty_val - min_difficulty) / (median_difficulty - min_difficulty) if median_difficulty != min_difficulty else 0
+                            color = interpolate_color('D8F3DC', 'FFFFB7', factor)
+                        else:
+                            # De la médiane (jaune) vers le maximum (rouge)
+                            factor = (difficulty_val - median_difficulty) / (max_difficulty - median_difficulty) if max_difficulty != median_difficulty else 0
+                            color = interpolate_color('FFFFB7', 'DD2C2F', factor)
+                        cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                
+                # Coloration "Volume de recherche"
+                if 'volume' in col_indices and volume_values:
+                    cell = ws_gap.cell(row=row_idx, column=col_indices['volume'])
+                    if cell.value is not None and str(cell.value).replace('.','').isdigit():
+                        # Dégradé du blanc au vert foncé basé sur le volume
+                        factor = (float(cell.value) - min_volume) / (max_volume - min_volume) if max_volume != min_volume else 0
+                        # Dégradé du blanc (FFFFFF) vers le vert (52B788)
+                        color = interpolate_color('FFFFFF', '52B788', factor)
+                        cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                
+                # Coloration des colonnes du domaine principal
+                if 'main_domain_cols' in col_indices:
+                    for col_idx in col_indices['main_domain_cols']:
+                        cell = ws_gap.cell(row=row_idx, column=col_idx)
+                        cell.fill = PatternFill(start_color="FFFFB7", end_color="FFFFB7", fill_type="solid")  # Jaune
+        
+        # Mise en forme des données - colonnes du domaine principal en jaune (déjà fait ci-dessus)
         
         # Ajustement des largeurs de colonnes
         for col_num in range(1, len(gap_df_display.columns) + 1):
