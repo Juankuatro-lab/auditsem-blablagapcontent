@@ -624,7 +624,7 @@ def generate_excel_report(analysis, main_domain, main_domain_analysis=None):
         gap_df = analysis['gap_content'].copy()
         
         # Réorganiser les colonnes : keyword, volume, difficulty, intent, puis toutes les positions
-        base_columns = ['keyword', 'volume', 'difficulty', 'intent']
+        base_cols = ['keyword', 'volume', 'difficulty', 'intent', 'competitor_count', 'best_position', 'best_url']
         position_columns = [col for col in gap_df.columns if col.endswith('_position')]
         url_columns = [col for col in gap_df.columns if col.endswith('_url')]
         
